@@ -1,7 +1,7 @@
 {
   "name": "liga-tochito",
   "version": "1.0.0",
-  "description": "Liga de Tochito Banderola: registro de jugadores, rosters y tabla de posiciones",
+  "description": "Liga de Papa Tocheros: registro de jugadores, rosters y tabla de posiciones",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

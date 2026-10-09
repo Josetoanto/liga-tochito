@@ -4,13 +4,13 @@ const layout = (title, body, extra = '') => `
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} · Liga Tochito Banderola</title>
+<title>${title} · Liga de Papa Tocheros</title>
 <link rel="stylesheet" href="/style.css">
 ${extra}
 </head>
 <body>
 <header class="topbar">
-  <a href="/" class="brand"><img src="/logo.jpg" alt="" class="brand-logo">Liga Tochito Banderola</a>
+  <a href="/" class="brand"><img src="/logo.jpg" alt="" class="brand-logo">Liga de Papa Tocheros</a>
   <nav><a href="/admin">Admin</a></nav>
 </header>
 <main>${body}</main>

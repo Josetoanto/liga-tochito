@@ -1,4 +1,4 @@
-# 🏈 Liga Tochito Banderola
+# 🏈 Liga de Papa Tocheros
 
 App web para administrar la liga: **registro de jugadores con foto**, **rosters por equipo** y **tabla de posiciones**.
 

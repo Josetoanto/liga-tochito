@@ -163,4 +163,4 @@ app.delete('/admin/games/:id', isAdmin, (req, res) => {
   res.redirect('/admin');
 });
 
-app.listen(port, () => console.log(`Liga Tochito Banderola en http://localhost:${port}`));
+app.listen(port, () => console.log(`Liga de Papa Tocheros en http://localhost:${port}`));
