@@ -33,6 +33,11 @@ CREATE TABLE IF NOT EXISTS games (
 );
 `);
 
+// Migración: agrega la columna del logo si falta (bases de datos ya existentes)
+if (!db.prepare('PRAGMA table_info(teams)').all().some((c) => c.name === 'logo')) {
+  db.exec('ALTER TABLE teams ADD COLUMN logo TEXT');
+}
+
 const uid = () => crypto.randomUUID();
 
 exports.createTeam = (name) => {
@@ -43,6 +48,7 @@ exports.createTeam = (name) => {
 exports.listTeams = () => db.prepare('SELECT * FROM teams ORDER BY name').all();
 exports.getTeamByToken = (token) => db.prepare('SELECT * FROM teams WHERE token = ?').get(token);
 exports.getTeam = (id) => db.prepare('SELECT * FROM teams WHERE id = ?').get(id);
+exports.setTeamLogo = (id, logo) => db.prepare('UPDATE teams SET logo = ? WHERE id = ?').run(logo, id);
 exports.deleteTeam = (id) => db.prepare('DELETE FROM teams WHERE id = ?').run(id);
 
 exports.addPlayer = ({ teamId, name, jersey, birthDate, photo }) => {
@@ -66,7 +72,7 @@ exports.deleteGame = (id) => db.prepare('DELETE FROM games WHERE id = ?').run(id
 exports.standings = () => {
   const teams = exports.listTeams();
   const rows = db.prepare(`
-    SELECT t.id, t.name,
+    SELECT t.id, t.name, t.logo,
       SUM(CASE WHEN g.home_id = t.id THEN 1 WHEN g.away_id = t.id THEN 1 ELSE 0 END) AS jj,
       SUM(CASE WHEN (g.home_id = t.id AND g.home_score > g.away_score) OR (g.away_id = t.id AND g.away_score > g.home_score) THEN 1 ELSE 0 END) AS jg,
       SUM(CASE WHEN (g.home_id = t.id AND g.home_score < g.away_score) OR (g.away_id = t.id AND g.away_score < g.home_score) THEN 1 ELSE 0 END) AS jp,

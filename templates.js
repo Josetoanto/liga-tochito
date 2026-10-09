@@ -30,7 +30,7 @@ exports.home = (standings, games, teams) => layout('Tabla de posiciones', `
     <tbody>
       ${standings.map((t, i) => `<tr>
         <td>${i + 1}</td>
-        <td><strong>${esc(t.name)}</strong></td>
+        <td>${t.logo ? `<img class="row-logo" src="/uploads/${esc(t.logo)}" alt="">` : ''}<strong>${esc(t.name)}</strong></td>
         <td>${t.jj || 0}</td><td>${t.jg || 0}</td><td>${t.jp || 0}</td>
         <td>${t.pf || 0}</td><td>${t.pc || 0}</td>
         <td>${pct(t.jj, t.jg || 0)}</td>
@@ -53,7 +53,7 @@ exports.home = (standings, games, teams) => layout('Tabla de posiciones', `
 <section>
   <h2>Equipos</h2>
   ${teams.length ? `<div class="cards">
-    ${teams.map((t) => `<a class="card" href="/team/${t.id}"><span class="card-emoji">🛡️</span>${esc(t.name)}</a>`).join('')}
+    ${teams.map((t) => `<a class="card" href="/team/${t.id}">${t.logo ? `<img class="card-logo" src="/uploads/${esc(t.logo)}" alt="">` : '<span class="card-emoji">🛡️</span>'}${esc(t.name)}</a>`).join('')}
   </div>` : '<p class="muted">Pide al admin que cree tu equipo.</p>'}
 </section>
 `);
@@ -74,7 +74,7 @@ exports.registerForm = (team, error = '') => layout(`Registro · ${team.name}`, 
       <input name="birth_date" type="date" required>
     </label>
     <label>Foto
-      <input name="photo" type="file" accept="image/*" capture="user" id="photo-input">
+      <input name="photo" type="file" accept="image/*" id="photo-input">
     </label>
     <div id="photo-preview" class="preview hidden"><img alt="Vista previa"><button type="button" id="photo-clear">Quitar foto</button></div>
     <button type="submit">Registrar</button>
@@ -133,7 +133,7 @@ exports.registerDone = () => layout('Registro completo', `
 
 exports.teamRoster = (team, players) => layout(`Roster · ${team.name}`, `
 <section>
-  <h2><span class="accent">${esc(team.name)}</span></h2>
+  <h2>${team.logo ? `<img class="heading-logo" src="/uploads/${esc(team.logo)}" alt="">` : ''}<span class="accent">${esc(team.name)}</span></h2>
   <p class="muted">${players.length} jugador${players.length === 1 ? '' : 'es'} registrado${players.length === 1 ? '' : 's'}</p>
   ${players.length ? `<div class="roster">
     ${players.map((p) => `<div class="player">
@@ -162,12 +162,13 @@ exports.adminLogin = (error = '') => layout('Admin', `
 exports.adminDashboard = (teams, standings, games) => layout('Admin · Liga', `
 <section>
   <h2>Equipos</h2>
-  <form method="post" action="/admin/teams" class="inline-form">
+  <form method="post" action="/admin/teams" class="inline-form" enctype="multipart/form-data">
     <input name="name" required maxlength="60" placeholder="Nombre del nuevo equipo">
+    <label class="file-field">Logo <input name="logo" type="file" accept="image/*"></label>
     <button type="submit">Crear equipo</button>
   </form>
   ${teams.length ? `<div class="table-wrap"><table>
-    <thead><tr><th>Equipo</th><th>Jugadores</th><th>Link de registro</th><th></th></tr></thead>
+    <thead><tr><th>Equipo</th><th>Jugadores</th><th>Link de registro</th><th>Logo</th><th></th></tr></thead>
     <tbody>
       ${teams.map((t) => `<tr>
         <td><strong>${esc(t.name)}</strong></td>
@@ -177,6 +178,13 @@ exports.adminDashboard = (teams, standings, games) => layout('Admin · Liga', `
           <button type="button" class="small" onclick="navigator.clipboard.writeText('${esc(t.regUrl)}').then(()=>this.textContent='Copiado ✓',()=>{this.previousElementSibling.select()})">Copiar</button>
           <a class="small" href="/r/${esc(t.token)}">Abrir</a>
           <a class="small" href="/team/${t.id}">Roster</a>
+        </td>
+        <td class="logo-cell">
+          ${t.logo ? `<img class="thumb" src="/uploads/${esc(t.logo)}" alt="">` : ''}
+          <form method="post" action="/admin/teams/${t.id}/logo" enctype="multipart/form-data" class="logo-form">
+            <input type="file" name="logo" accept="image/*" required>
+            <button type="submit" class="small">Guardar</button>
+          </form>
         </td>
         <td><form method="post" action="/admin/teams/${t.id}?_method=DELETE" onsubmit="return confirm('Borrar equipo ${esc(t.name)} y todo su roster?')"><button type="submit" class="danger small">Borrar</button></form></td>
       </tr>`).join('')}

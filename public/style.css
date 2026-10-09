@@ -205,6 +205,15 @@ td a { color: #c4b5fd; text-decoration: none; font-weight: 600; }
   background: var(--glass-strong);
 }
 .card-emoji { display: block; font-size: 1.7rem; margin-bottom: 0.35rem; }
+.card-logo { display: block; width: 3.2rem; height: 3.2rem; margin: 0 auto 0.45rem; object-fit: contain; border-radius: 10px; }
+.row-logo { width: 1.4rem; height: 1.4rem; object-fit: contain; border-radius: 5px; vertical-align: middle; margin-right: 0.45rem; }
+.heading-logo { width: 2.2rem; height: 2.2rem; object-fit: contain; border-radius: 8px; vertical-align: middle; margin-right: 0.5rem; }
+.thumb { width: 1.7rem; height: 1.7rem; object-fit: contain; border-radius: 5px; vertical-align: middle; }
+.logo-cell { white-space: normal; }
+.logo-form { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.35rem; }
+.logo-form input[type="file"] { width: auto; max-width: 11rem; padding: 0.25rem; font-size: 0.72rem; margin-top: 0; }
+.file-field { display: flex; flex-direction: column; }
+.file-field input[type="file"] { width: auto; }
 
 .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.85rem; }
 .player {

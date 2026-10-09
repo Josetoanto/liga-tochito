@@ -119,13 +119,23 @@ app.post('/admin/logout', isAdmin, (req, res) => {
   res.redirect('/');
 });
 
-app.post('/admin/teams', isAdmin, (req, res) => {
+app.post('/admin/teams', isAdmin, upload.single('logo'), (req, res) => {
   const name = (req.body.name || '').trim();
   if (name) {
-    try { db.createTeam(name); } catch (e) {
+    try {
+      const team = db.createTeam(name);
+      if (req.file) db.setTeamLogo(team.id, req.file.filename);
+    } catch (e) {
+      if (req.file) fs.unlink(req.file.path, () => {});
       if (!String(e.message).includes('UNIQUE')) throw e;
     }
   }
+  res.redirect('/admin');
+});
+
+app.post('/admin/teams/:id/logo', isAdmin, upload.single('logo'), (req, res) => {
+  if (req.file && db.getTeam(req.params.id)) db.setTeamLogo(req.params.id, req.file.filename);
+  else if (req.file) fs.unlink(req.file.path, () => {});
   res.redirect('/admin');
 });
 
