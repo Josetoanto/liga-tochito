@@ -1,0 +1,8 @@
+node_modules/
+liga.db
+liga.db-wal
+liga.db-shm
+admin_token.txt
+uploads/
+.env
+.DS_Store
