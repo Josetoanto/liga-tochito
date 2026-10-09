@@ -53,6 +53,14 @@ const isAdmin = (req, res, next) => {
   res.redirect('/admin');
 };
 
+const ROSTER_HOURS = 72;
+const regOpen = () => {
+  const deadline = db.getSetting('roster_deadline');
+  return deadline && Date.parse(deadline) > Date.now();
+};
+const requireOpen = (req, res, next) =>
+  regOpen() ? next() : res.status(403).send(t.registrationClosed());
+
 // ---------- Públicas ----------
 app.get('/', (req, res) => {
   res.send(t.home(db.standings(), db.recentGames(), db.listTeams()));
@@ -64,13 +72,14 @@ app.get('/team/:id', (req, res) => {
   res.send(t.teamRoster(team, db.listPlayers(team.id)));
 });
 
-app.get('/r/:token', (req, res) => {
+app.get('/r/:token', requireOpen, (req, res) => {
   const team = db.getTeamByToken(req.params.token);
   if (!team) return res.status(404).send('Link inválido o equipo borrado');
-  res.send(t.registerForm(team));
+  const deadline = new Date(db.getSetting('roster_deadline'));
+  res.send(t.registerForm(team, '', req.query.ok ? 'Jugador registrado ✓. Registra el siguiente.' : '', deadline));
 });
 
-app.post('/r/:token', upload.single('photo'), (req, res) => {
+app.post('/r/:token', requireOpen, upload.single('photo'), (req, res) => {
   const team = db.getTeamByToken(req.params.token);
   if (!team) return res.status(404).send('Link inválido');
   const { name, jersey, birth_date } = req.body;
@@ -93,9 +102,8 @@ app.post('/r/:token', upload.single('photo'), (req, res) => {
     }
     throw e;
   }
-  res.redirect('/listo');
+  res.redirect('/r/' + team.token + '?ok=1');
 });
-app.get('/listo', (req, res) => res.send(t.registerDone()));
 
 // ---------- Admin ----------
 app.get('/admin', (req, res) => {
@@ -103,7 +111,24 @@ app.get('/admin', (req, res) => {
   if (!cookie || cookie[1] !== ADMIN_TOKEN) return res.send(t.adminLogin());
   const origin = `${req.protocol}://${req.get('host')}`;
   const teams = db.listTeams().map((x) => ({ ...x, count: db.listPlayers(x.id).length, regUrl: `${origin}/r/${x.token}` }));
-  res.send(t.adminDashboard(teams, db.standings(), db.recentGames()));
+  const deadline = db.getSetting('roster_deadline');
+  res.send(t.adminDashboard(teams, db.standings(), db.recentGames(), deadline ? new Date(deadline) : null));
+});
+
+app.post('/admin/registration/open', isAdmin, (req, res) => {
+  db.setSetting('roster_deadline', new Date(Date.now() + ROSTER_HOURS * 3600 * 1000).toISOString());
+  res.redirect('/admin');
+});
+
+app.post('/admin/registration/extend', isAdmin, (req, res) => {
+  const d = db.getSetting('roster_deadline');
+  if (d && Date.parse(d) > Date.now()) db.setSetting('roster_deadline', new Date(Date.parse(d) + 24 * 3600 * 1000).toISOString());
+  res.redirect('/admin');
+});
+
+app.post('/admin/registration/close', isAdmin, (req, res) => {
+  db.deleteSetting('roster_deadline');
+  res.redirect('/admin');
 });
 
 app.post('/admin/login', (req, res) => {

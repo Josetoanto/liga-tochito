@@ -58,10 +58,20 @@ exports.home = (standings, games, teams) => layout('Tabla de posiciones', `
 </section>
 `);
 
-exports.registerForm = (team, error = '') => layout(`Registro · ${team.name}`, `
+const fmtRemaining = (deadline) => {
+  const ms = deadline - Date.now();
+  if (ms <= 0) return 'cerrado';
+  const h = Math.floor(ms / 3600e3);
+  const m = Math.floor((ms % 3600e3) / 60e3);
+  return `${h}h ${m}m`;
+};
+
+exports.registerForm = (team, error = '', success = '', deadline = null) => layout(`Registro · ${team.name}`, `
 <section class="narrow">
   <h2>Regístrate en <span class="accent">${esc(team.name)}</span></h2>
   <p class="muted">Llena tus datos y sube una foto. El número de jersey queda reservado para ti.</p>
+  ${deadline ? `<p class="muted">El registro cierra en <strong>${fmtRemaining(deadline)}</strong>.</p>` : ''}
+  ${success ? `<p class="success">${esc(success)}</p>` : ''}
   ${error ? `<p class="error">${esc(error)}</p>` : ''}
   <form method="post" enctype="multipart/form-data" id="reg-form">
     <label>Nombre completo
@@ -122,11 +132,11 @@ form.addEventListener('submit', (e) => {
 </script>
 `);
 
-exports.registerDone = () => layout('Registro completo', `
+exports.registrationClosed = () => layout('Registro cerrado', `
 <section class="narrow center">
-  <div class="big-emoji">✅</div>
-  <h2>¡Registro completo!</h2>
-  <p>Tu ficha ya está en el roster del equipo. Nos vemos en el campo.</p>
+  <div class="big-emoji">🔒</div>
+  <h2>El registro de jugadores terminó</h2>
+  <p>La liga ya comenzó y los rosters están cerrados.</p>
   <p><a class="btn-link" href="/">Ver tabla de posiciones</a></p>
 </section>
 `);
@@ -159,7 +169,19 @@ exports.adminLogin = (error = '') => layout('Admin', `
 </section>
 `);
 
-exports.adminDashboard = (teams, standings, games) => layout('Admin · Liga', `
+exports.adminDashboard = (teams, standings, games, deadline) => layout('Admin · Liga', `
+<section class="reg-card ${deadline && deadline > new Date() ? 'open' : 'closed'}">
+  <h2>Registro de rosters</h2>
+  ${deadline && deadline > new Date() ? `
+  <p>Abierto · cierra en <strong>${fmtRemaining(deadline)}</strong> (${esc(deadline.toLocaleString())})</p>
+  <div class="reg-actions">
+    <form method="post" action="/admin/registration/extend"><button type="submit" class="small">Extender 24h</button></form>
+    <form method="post" action="/admin/registration/close" onsubmit="return confirm('Cerrar el registro ahora? Ya nadie podrá registrar jugadores.')"><button type="submit" class="small danger">Cerrar registro</button></form>
+  </div>` : `
+  <p>Cerrado. Los jugadores no pueden registrarse.</p>
+  <form method="post" action="/admin/registration/open"><button type="submit">Abrir registro por 72h</button></form>`}
+</section>
+
 <section>
   <h2>Equipos</h2>
   <form method="post" action="/admin/teams" class="inline-form" enctype="multipart/form-data">

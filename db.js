@@ -31,6 +31,10 @@ CREATE TABLE IF NOT EXISTS games (
   away_score INTEGER NOT NULL,
   played_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
 `);
 
 // Migración: agrega la columna del logo si falta (bases de datos ya existentes)
@@ -68,6 +72,11 @@ exports.addGame = ({ homeId, awayId, homeScore, awayScore, playedAt }) => {
   return id;
 };
 exports.deleteGame = (id) => db.prepare('DELETE FROM games WHERE id = ?').run(id);
+
+exports.getSetting = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value ?? null;
+exports.setSetting = (key, value) =>
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+exports.deleteSetting = (key) => db.prepare('DELETE FROM settings WHERE key = ?').run(key);
 
 exports.standings = () => {
   const teams = exports.listTeams();
