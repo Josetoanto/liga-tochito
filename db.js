@@ -72,6 +72,10 @@ exports.addGame = ({ homeId, awayId, homeScore, awayScore, playedAt }) => {
   return id;
 };
 exports.deleteGame = (id) => db.prepare('DELETE FROM games WHERE id = ?').run(id);
+exports.getGame = (id) => db.prepare('SELECT * FROM games WHERE id = ?').get(id);
+exports.updateGame = (id, { homeId, awayId, homeScore, awayScore, playedAt }) =>
+  db.prepare('UPDATE games SET home_id = ?, away_id = ?, home_score = ?, away_score = ?, played_at = ? WHERE id = ?')
+    .run(homeId, awayId, homeScore, awayScore, playedAt || new Date().toISOString().slice(0, 16).replace('T', ' '), id);
 
 exports.getSetting = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value ?? null;
 exports.setSetting = (key, value) =>

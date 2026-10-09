@@ -169,7 +169,7 @@ exports.adminLogin = (error = '') => layout('Admin', `
 </section>
 `);
 
-exports.adminDashboard = (teams, standings, games, deadline) => layout('Admin · Liga', `
+exports.adminDashboard = (teams, standings, games, deadline, editGame = null) => layout('Admin · Liga', `
 <section class="reg-card ${deadline && deadline > new Date() ? 'open' : 'closed'}">
   <h2>Registro de rosters</h2>
   ${deadline && deadline > new Date() ? `
@@ -215,16 +215,17 @@ exports.adminDashboard = (teams, standings, games, deadline) => layout('Admin ·
 </section>
 
 <section>
-  <h2>Registrar resultado</h2>
+  <h2>${editGame ? 'Editar resultado' : 'Registrar resultado'}</h2>
   ${teams.length >= 2 ? `
-  <form method="post" action="/admin/games" class="inline-form wrap">
-    <label>Local <select name="home_id" required>${teams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
-    <input name="home_score" type="number" required min="0" class="score" placeholder="0">
+  <form method="post" action="${editGame ? `/admin/games/${esc(editGame.id)}` : '/admin/games'}" class="inline-form wrap">
+    <label>Local <select name="home_id" required>${teams.map((t) => `<option value="${t.id}" ${editGame && editGame.home_id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
+    <input name="home_score" type="number" required min="0" class="score" placeholder="0" value="${editGame ? editGame.home_score : ''}">
     <span class="vs">vs</span>
-    <input name="away_score" type="number" required min="0" class="score" placeholder="0">
-    <label><select name="away_id" required>${teams.map((t, i) => `<option value="${t.id}" ${i === 1 ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select> Visitante</label>
-    <label>Fecha <input name="played_at" type="datetime-local"></label>
-    <button type="submit">Guardar resultado</button>
+    <input name="away_score" type="number" required min="0" class="score" placeholder="0" value="${editGame ? editGame.away_score : ''}">
+    <label><select name="away_id" required>${teams.map((t, i) => `<option value="${t.id}" ${(editGame ? editGame.away_id === t.id : i === 1) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select> Visitante</label>
+    <label>Fecha <input name="played_at" type="datetime-local" value="${editGame ? editGame.played_at.replace(' ', 'T') : ''}"></label>
+    <button type="submit">${editGame ? 'Guardar cambios' : 'Guardar resultado'}</button>
+    ${editGame ? `<a class="small" href="/admin">Cancelar</a>` : ''}
   </form>` : '<p class="muted">Necesitas al menos 2 equipos.</p>'}
 
   ${games.length ? `<div class="table-wrap"><table>
@@ -233,7 +234,7 @@ exports.adminDashboard = (teams, standings, games, deadline) => layout('Admin ·
       ${games.map((g) => `<tr>
         <td>${esc(g.played_at)}</td>
         <td>${esc(g.home_name)} <b>${g.home_score}</b> — <b>${g.away_score}</b> ${esc(g.away_name)}</td>
-        <td><form method="post" action="/admin/games/${g.id}?_method=DELETE" onsubmit="return confirm('Borrar este juego?')"><button type="submit" class="danger small">Borrar</button></form></td>
+        <td><span class="game-actions"><a class="small" href="/admin?edit=${esc(g.id)}">Editar</a> <form method="post" action="/admin/games/${g.id}?_method=DELETE" onsubmit="return confirm('Borrar este juego?')"><button type="submit" class="danger small">Borrar</button></form></span></td>
       </tr>`).join('')}
     </tbody>
   </table></div>` : ''}

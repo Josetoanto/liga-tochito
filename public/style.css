@@ -183,6 +183,8 @@ button.small, .small {
 }
 
 .table-wrap { overflow-x: auto; border-radius: 18px; }
+.game-actions { display: flex; align-items: center; gap: 0.5rem; }
+.game-actions form { margin: 0; }
 table {
   width: 100%;
   border-collapse: collapse;

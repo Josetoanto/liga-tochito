@@ -112,7 +112,9 @@ app.get('/admin', (req, res) => {
   const origin = `${req.protocol}://${req.get('host')}`;
   const teams = db.listTeams().map((x) => ({ ...x, count: db.listPlayers(x.id).length, regUrl: `${origin}/r/${x.token}` }));
   const deadline = db.getSetting('roster_deadline');
-  res.send(t.adminDashboard(teams, db.standings(), db.recentGames(), deadline ? new Date(deadline) : null));
+  const games = db.recentGames();
+  const editGame = req.query.edit ? games.find((g) => g.id === req.query.edit) : null;
+  res.send(t.adminDashboard(teams, db.standings(), games, deadline ? new Date(deadline) : null, editGame));
 });
 
 app.post('/admin/registration/open', isAdmin, (req, res) => {
@@ -173,6 +175,20 @@ app.post('/admin/games', isAdmin, (req, res) => {
   const { home_id, away_id, home_score, away_score, played_at } = req.body;
   if (home_id !== away_id && home_score !== '' && away_score !== '') {
     db.addGame({
+      homeId: home_id,
+      awayId: away_id,
+      homeScore: parseInt(home_score, 10),
+      awayScore: parseInt(away_score, 10),
+      playedAt: played_at ? played_at.replace('T', ' ') : null,
+    });
+  }
+  res.redirect('/admin');
+});
+
+app.post('/admin/games/:id', isAdmin, (req, res) => {
+  const { home_id, away_id, home_score, away_score, played_at } = req.body;
+  if (home_id !== away_id && home_score !== '' && away_score !== '' && db.getGame(req.params.id)) {
+    db.updateGame(req.params.id, {
       homeId: home_id,
       awayId: away_id,
       homeScore: parseInt(home_score, 10),
