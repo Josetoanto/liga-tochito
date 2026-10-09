@@ -98,9 +98,9 @@ exports.standings = () => {
   return teams
     .map((t) => byId.get(t.id))
     .sort((a, b) => {
-      const pa = a.jj ? a.jg / a.jj : 0;
-      const pb = b.jj ? b.jg / b.jj : 0;
-      return pb - pa || b.pf - a.pf || a.name.localeCompare(b.name);
+      const da = (a.pf || 0) - (a.pc || 0);
+      const dbd = (b.pf || 0) - (b.pc || 0);
+      return dbd - da || b.pf - a.pf || a.name.localeCompare(b.name);
     });
 };
 

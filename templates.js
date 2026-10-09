@@ -19,21 +19,24 @@ ${extra}
 </html>`;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const pct = (jj, jg) => (jj ? (jg / jj).toFixed(3).replace(/^0\./, '.') : '.000');
+const dif = (t) => {
+  const d = (t.pf || 0) - (t.pc || 0);
+  return (d > 0 ? '+' : '') + d;
+};
 
 exports.home = (standings, games, teams) => layout('Tabla de posiciones', `
 <section>
   <h2>Tabla de posiciones</h2>
   ${standings.length ? `
   <div class="table-wrap"><table>
-    <thead><tr><th>#</th><th>Equipo</th><th>JJ</th><th>JG</th><th>JP</th><th>PF</th><th>PC</th><th>%</th><th></th></tr></thead>
+    <thead><tr><th>#</th><th>Equipo</th><th>JJ</th><th>JG</th><th>JP</th><th>PF</th><th>PC</th><th>Dif</th><th></th></tr></thead>
     <tbody>
       ${standings.map((t, i) => `<tr>
         <td>${i + 1}</td>
         <td>${t.logo ? `<img class="row-logo" src="/uploads/${esc(t.logo)}" alt="">` : ''}<strong>${esc(t.name)}</strong></td>
         <td>${t.jj || 0}</td><td>${t.jg || 0}</td><td>${t.jp || 0}</td>
         <td>${t.pf || 0}</td><td>${t.pc || 0}</td>
-        <td>${pct(t.jj, t.jg || 0)}</td>
+        <td>${dif(t)}</td>
         <td><a href="/team/${t.id}">Roster →</a></td>
       </tr>`).join('')}
     </tbody>
