@@ -10,7 +10,7 @@ ${extra}
 </head>
 <body>
 <header class="topbar">
-  <a href="/" class="brand">🏈 Liga Tochito Banderola</a>
+  <a href="/" class="brand"><img src="/logo.jpg" alt="" class="brand-logo">Liga Tochito Banderola</a>
   <nav><a href="/admin">Admin</a></nav>
 </header>
 <main>${body}</main>
