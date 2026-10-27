@@ -1,10 +1,12 @@
 # 🏈 Liga de Papa Tocheros
 
-App web para administrar la liga: **registro de jugadores con foto**, **rosters por equipo** y **tabla de posiciones**.
+App web para administrar varios torneos: **registro de jugadores con foto**, **rosters por equipo** y **tabla de posiciones** independiente por torneo.
 
 - **Link de registro**: compartes un link por equipo (WhatsApp), cada jugador llena su ficha.
-- **Admin**: creas equipos, copias los links y capturas los resultados de los juegos.
-- **Público**: cualquiera con el link de la liga ve la tabla de posiciones y los rosters.
+- **Admin**: creas torneos y equipos, copias los links y capturas los resultados de cada torneo.
+- **Público**: cualquiera con el link del torneo ve su tabla de posiciones y los rosters.
+
+Cada torneo tiene sus propios equipos, jugadores, links de registro, juegos y tabla. Los datos de un torneo nunca se mezclan con los de otro.
 
 ## Correr en tu computadora
 
@@ -20,10 +22,13 @@ Abre http://localhost:3000. La primera vez imprime en la terminal la **contrase�
 ## Cómo se usa
 
 1. Entra a `/admin` con la contraseña.
-2. Crea un equipo → se genera un **link de registro** único.
-3. Manda ese link al equipo por WhatsApp. Cada jugador pone nombre, número de jersey, fecha de nacimiento y su foto (se sube desde el celular y se comprime sola).
-4. Cuando terminen, en el admin registrarás cada juego (local vs visitante y el marcador). La **tabla de posiciones** se actualiza sola.
-5. Comparte la página principal (`/`) para que todos vean puntos y resultados.
+2. Crea un **torneo** (por ejemplo, "Torneo Femenil 2026"). La liga actual ya existe como "Liga de Papa Tocheros".
+3. Dentro del torneo, crea un equipo → se genera un **link de registro** único.
+4. Abre el registro del torneo y manda cada link al equipo por WhatsApp. Cada jugador pone nombre, número de jersey, fecha de nacimiento y su foto (se sube desde el celular y se comprime sola).
+5. Cuando terminen, registra cada juego (local vs visitante y el marcador). La **tabla de posiciones** de ese torneo se actualiza sola.
+6. Comparte el link del torneo (`/t/nombre-del-torneo`) para que todos vean puntos y resultados.
+
+Para empezar otro torneo, repite desde el paso 2. No necesitas terminar el anterior: cada uno guarda sus propios datos y su propio registro.
 
 ## Subir a la nube (Railway, gratis)
 

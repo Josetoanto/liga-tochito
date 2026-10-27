@@ -53,43 +53,69 @@ const isAdmin = (req, res, next) => {
   res.redirect('/admin');
 };
 
-const ROSTER_HOURS = 72;
-const regOpen = () => {
-  const deadline = db.getSetting('roster_deadline');
-  return deadline && Date.parse(deadline) > Date.now();
+const loadTournament = (req, res, next) => {
+  const tournament = db.getTournament(req.params.tid);
+  if (!tournament) return res.status(404).send('Torneo no encontrado');
+  req.tournament = tournament;
+  next();
 };
+
+const loadTeam = (req, res, next) => {
+  const team = db.getTeamByToken(req.params.token);
+  if (!team) return res.status(404).send('Link inválido o equipo borrado');
+  const tournament = db.getTournament(team.tournament_id);
+  if (!tournament) return res.status(404).send('Torneo no encontrado');
+  req.team = team;
+  req.tournament = tournament;
+  next();
+};
+
+const ROSTER_HOURS = 72;
+const regOpen = (tournament) => tournament.roster_deadline && Date.parse(tournament.roster_deadline) > Date.now();
 const requireOpen = (req, res, next) =>
-  regOpen() ? next() : res.status(403).send(t.registrationClosed());
+  regOpen(req.tournament) ? next() : res.status(403).send(t.registrationClosed(req.tournament));
+
+const deadlineOf = (tournament) => (tournament.roster_deadline ? new Date(tournament.roster_deadline) : null);
 
 // ---------- Públicas ----------
 app.get('/', (req, res) => {
-  res.send(t.home(db.standings(), db.recentGames(), db.listTeams()));
+  res.send(t.tournamentsIndex(db.listTournaments()));
+});
+
+app.get('/t/:slug', (req, res) => {
+  const tournament = db.getTournamentBySlug(req.params.slug);
+  if (!tournament) return res.status(404).send('Torneo no encontrado');
+  res.send(t.tournament(
+    tournament,
+    db.standings(tournament.id),
+    db.recentGames(tournament.id),
+    db.listTeams(tournament.id)
+  ));
 });
 
 app.get('/team/:id', (req, res) => {
   const team = db.getTeam(req.params.id);
   if (!team) return res.status(404).send('Equipo no encontrado');
-  res.send(t.teamRoster(team, db.listPlayers(team.id)));
+  const tournament = db.getTournament(team.tournament_id);
+  if (!tournament) return res.status(404).send('Torneo no encontrado');
+  res.send(t.teamRoster(team, db.listPlayers(team.id), tournament));
 });
 
-app.get('/r/:token', requireOpen, (req, res) => {
-  const team = db.getTeamByToken(req.params.token);
-  if (!team) return res.status(404).send('Link inválido o equipo borrado');
-  const deadline = new Date(db.getSetting('roster_deadline'));
-  res.send(t.registerForm(team, '', req.query.ok ? 'Jugador registrado ✓. Registra el siguiente.' : '', deadline));
+app.get('/r/:token', loadTeam, requireOpen, (req, res) => {
+  const success = req.query.ok ? 'Jugador registrado ✓. Registra el siguiente.' : '';
+  res.send(t.registerForm(req.team, req.tournament, '', success, deadlineOf(req.tournament)));
 });
 
-app.post('/r/:token', requireOpen, upload.single('photo'), (req, res) => {
-  const team = db.getTeamByToken(req.params.token);
-  if (!team) return res.status(404).send('Link inválido');
+app.post('/r/:token', loadTeam, requireOpen, upload.single('photo'), (req, res) => {
   const { name, jersey, birth_date } = req.body;
+  const deadline = deadlineOf(req.tournament);
   if (!name || !birth_date || jersey === undefined || jersey === '') {
     if (req.file) fs.unlink(req.file.path, () => {});
-    return res.status(400).send(t.registerForm(team, 'Faltan datos obligatorios.'));
+    return res.status(400).send(t.registerForm(req.team, req.tournament, 'Faltan datos obligatorios.', '', deadline));
   }
   try {
     db.addPlayer({
-      teamId: team.id,
+      teamId: req.team.id,
       name,
       jersey: parseInt(jersey, 10),
       birthDate: birth_date,
@@ -98,39 +124,18 @@ app.post('/r/:token', requireOpen, upload.single('photo'), (req, res) => {
   } catch (e) {
     if (req.file) fs.unlink(req.file.path, () => {});
     if (String(e.message).includes('UNIQUE')) {
-      return res.status(400).send(t.registerForm(team, `El número ${jersey} ya está tomado en este equipo. Elige otro.`));
+      return res.status(400).send(t.registerForm(req.team, req.tournament, `El número ${jersey} ya está tomado en este equipo. Elige otro.`, '', deadline));
     }
     throw e;
   }
-  res.redirect('/r/' + team.token + '?ok=1');
+  res.redirect('/r/' + req.team.token + '?ok=1');
 });
 
 // ---------- Admin ----------
 app.get('/admin', (req, res) => {
   const cookie = (req.headers.cookie || '').match(/admin_token=([^;]+)/);
   if (!cookie || cookie[1] !== ADMIN_TOKEN) return res.send(t.adminLogin());
-  const origin = `${req.protocol}://${req.get('host')}`;
-  const teams = db.listTeams().map((x) => ({ ...x, count: db.listPlayers(x.id).length, regUrl: `${origin}/r/${x.token}` }));
-  const deadline = db.getSetting('roster_deadline');
-  const games = db.recentGames();
-  const editGame = req.query.edit ? games.find((g) => g.id === req.query.edit) : null;
-  res.send(t.adminDashboard(teams, db.standings(), games, deadline ? new Date(deadline) : null, editGame));
-});
-
-app.post('/admin/registration/open', isAdmin, (req, res) => {
-  db.setSetting('roster_deadline', new Date(Date.now() + ROSTER_HOURS * 3600 * 1000).toISOString());
-  res.redirect('/admin');
-});
-
-app.post('/admin/registration/extend', isAdmin, (req, res) => {
-  const d = db.getSetting('roster_deadline');
-  if (d && Date.parse(d) > Date.now()) db.setSetting('roster_deadline', new Date(Date.parse(d) + 24 * 3600 * 1000).toISOString());
-  res.redirect('/admin');
-});
-
-app.post('/admin/registration/close', isAdmin, (req, res) => {
-  db.deleteSetting('roster_deadline');
-  res.redirect('/admin');
+  res.send(t.adminTournaments(db.listTournaments()));
 });
 
 app.post('/admin/login', (req, res) => {
@@ -146,62 +151,114 @@ app.post('/admin/logout', isAdmin, (req, res) => {
   res.redirect('/');
 });
 
-app.post('/admin/teams', isAdmin, upload.single('logo'), (req, res) => {
+app.post('/admin/tournaments', isAdmin, (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/admin');
+  const tournament = db.createTournament(name);
+  res.redirect('/admin/t/' + tournament.id);
+});
+
+app.get('/admin/t/:tid', isAdmin, loadTournament, (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const teams = db.listTeams(req.tournament.id)
+    .map((x) => ({ ...x, count: db.listPlayers(x.id).length, regUrl: `${origin}/r/${x.token}` }));
+  const games = db.recentGames(req.tournament.id);
+  const editGame = req.query.edit ? games.find((g) => g.id === req.query.edit) : null;
+  res.send(t.adminDashboard(
+    req.tournament,
+    teams,
+    db.standings(req.tournament.id),
+    games,
+    deadlineOf(req.tournament),
+    editGame
+  ));
+});
+
+app.post('/admin/t/:tid/registration/open', isAdmin, loadTournament, (req, res) => {
+  db.setTournamentDeadline(req.tournament.id, new Date(Date.now() + ROSTER_HOURS * 3600 * 1000).toISOString());
+  res.redirect('/admin/t/' + req.tournament.id);
+});
+
+app.post('/admin/t/:tid/registration/extend', isAdmin, loadTournament, (req, res) => {
+  const deadline = req.tournament.roster_deadline;
+  if (deadline && Date.parse(deadline) > Date.now()) {
+    db.setTournamentDeadline(req.tournament.id, new Date(Date.parse(deadline) + 24 * 3600 * 1000).toISOString());
+  }
+  res.redirect('/admin/t/' + req.tournament.id);
+});
+
+app.post('/admin/t/:tid/registration/close', isAdmin, loadTournament, (req, res) => {
+  db.setTournamentDeadline(req.tournament.id, null);
+  res.redirect('/admin/t/' + req.tournament.id);
+});
+
+app.post('/admin/t/:tid/teams', isAdmin, loadTournament, upload.single('logo'), (req, res) => {
   const name = (req.body.name || '').trim();
   if (name) {
     try {
-      const team = db.createTeam(name);
+      const team = db.createTeam(req.tournament.id, name);
       if (req.file) db.setTeamLogo(team.id, req.file.filename);
     } catch (e) {
       if (req.file) fs.unlink(req.file.path, () => {});
       if (!String(e.message).includes('UNIQUE')) throw e;
     }
   }
-  res.redirect('/admin');
+  res.redirect('/admin/t/' + req.tournament.id);
 });
 
-app.post('/admin/teams/:id/logo', isAdmin, upload.single('logo'), (req, res) => {
-  if (req.file && db.getTeam(req.params.id)) db.setTeamLogo(req.params.id, req.file.filename);
+app.post('/admin/t/:tid/teams/:teamId/logo', isAdmin, loadTournament, upload.single('logo'), (req, res) => {
+  const team = db.getTeam(req.params.teamId);
+  if (req.file && team && team.tournament_id === req.tournament.id) db.setTeamLogo(team.id, req.file.filename);
   else if (req.file) fs.unlink(req.file.path, () => {});
-  res.redirect('/admin');
+  res.redirect('/admin/t/' + req.tournament.id);
 });
 
-app.delete('/admin/teams/:id', isAdmin, (req, res) => {
-  db.deleteTeam(req.params.id);
-  res.redirect('/admin');
+app.delete('/admin/t/:tid/teams/:teamId', isAdmin, loadTournament, (req, res) => {
+  const team = db.getTeam(req.params.teamId);
+  if (team && team.tournament_id === req.tournament.id) db.deleteTeam(team.id);
+  res.redirect('/admin/t/' + req.tournament.id);
 });
 
-app.post('/admin/games', isAdmin, (req, res) => {
+const gameInput = (req) => {
   const { home_id, away_id, home_score, away_score, played_at } = req.body;
-  if (home_id !== away_id && home_score !== '' && away_score !== '') {
-    db.addGame({
-      homeId: home_id,
-      awayId: away_id,
-      homeScore: parseInt(home_score, 10),
-      awayScore: parseInt(away_score, 10),
-      playedAt: played_at ? played_at.replace('T', ' ') : null,
-    });
-  }
-  res.redirect('/admin');
+  const home = db.getTeam(home_id);
+  const away = db.getTeam(away_id);
+  const homeScore = parseInt(home_score, 10);
+  const awayScore = parseInt(away_score, 10);
+  if (
+    !home || !away ||
+    home.tournament_id !== req.tournament.id ||
+    away.tournament_id !== req.tournament.id ||
+    home_id === away_id ||
+    home_score === '' || away_score === '' ||
+    !Number.isFinite(homeScore) || !Number.isFinite(awayScore)
+  ) return null;
+  return {
+    homeId: home_id,
+    awayId: away_id,
+    homeScore,
+    awayScore,
+    playedAt: played_at ? played_at.replace('T', ' ') : null,
+  };
+};
+
+app.post('/admin/t/:tid/games', isAdmin, loadTournament, (req, res) => {
+  const input = gameInput(req);
+  if (input) db.addGame({ tournamentId: req.tournament.id, ...input });
+  res.redirect('/admin/t/' + req.tournament.id);
 });
 
-app.post('/admin/games/:id', isAdmin, (req, res) => {
-  const { home_id, away_id, home_score, away_score, played_at } = req.body;
-  if (home_id !== away_id && home_score !== '' && away_score !== '' && db.getGame(req.params.id)) {
-    db.updateGame(req.params.id, {
-      homeId: home_id,
-      awayId: away_id,
-      homeScore: parseInt(home_score, 10),
-      awayScore: parseInt(away_score, 10),
-      playedAt: played_at ? played_at.replace('T', ' ') : null,
-    });
-  }
-  res.redirect('/admin');
+app.post('/admin/t/:tid/games/:id', isAdmin, loadTournament, (req, res) => {
+  const game = db.getGame(req.params.id);
+  const input = gameInput(req);
+  if (input && game && game.tournament_id === req.tournament.id) db.updateGame(game.id, input);
+  res.redirect('/admin/t/' + req.tournament.id);
 });
 
-app.delete('/admin/games/:id', isAdmin, (req, res) => {
-  db.deleteGame(req.params.id);
-  res.redirect('/admin');
+app.delete('/admin/t/:tid/games/:id', isAdmin, loadTournament, (req, res) => {
+  const game = db.getGame(req.params.id);
+  if (game && game.tournament_id === req.tournament.id) db.deleteGame(game.id);
+  res.redirect('/admin/t/' + req.tournament.id);
 });
 
 app.listen(port, () => console.log(`Liga de Papa Tocheros en http://localhost:${port}`));

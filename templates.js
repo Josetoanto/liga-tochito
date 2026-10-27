@@ -11,7 +11,7 @@ ${extra}
 <body>
 <header class="topbar">
   <a href="/" class="brand"><img src="/logo.jpg" alt="" class="brand-logo">Liga de Papa Tocheros</a>
-  <nav><a href="/admin">Admin</a></nav>
+  <nav><a href="/">Torneos</a> <a href="/admin">Admin</a></nav>
 </header>
 <main>${body}</main>
 <footer>Hecho con cariño para la liga</footer>
@@ -23,10 +23,24 @@ const dif = (t) => {
   const d = (t.pf || 0) - (t.pc || 0);
   return (d > 0 ? '+' : '') + d;
 };
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-exports.home = (standings, games, teams) => layout('Tabla de posiciones', `
+exports.tournamentsIndex = (tournaments) => layout('Torneos', `
 <section>
-  <h2>Tabla de posiciones</h2>
+  <h2>Torneos</h2>
+  ${tournaments.length ? `<div class="cards">
+    ${tournaments.map((t) => `<a class="card" href="/t/${esc(t.slug)}">
+      <span class="card-emoji">🏈</span>${esc(t.name)}
+      <span class="card-meta">${plural(t.team_count, 'equipo', 'equipos')}</span>
+    </a>`).join('')}
+  </div>` : '<p class="muted">Aún no hay torneos. Crea el primero desde el admin.</p>'}
+</section>
+`);
+
+exports.tournament = (tournament, standings, games, teams) => layout(tournament.name, `
+<p><a class="small" href="/">← Todos los torneos</a></p>
+<section>
+  <h2>${esc(tournament.name)}</h2>
   ${standings.length ? `
   <div class="table-wrap"><table>
     <thead><tr><th>#</th><th>Equipo</th><th>JJ</th><th>JG</th><th>JP</th><th>PF</th><th>PC</th><th>Dif</th><th></th></tr></thead>
@@ -40,7 +54,7 @@ exports.home = (standings, games, teams) => layout('Tabla de posiciones', `
         <td><a href="/team/${t.id}">Roster →</a></td>
       </tr>`).join('')}
     </tbody>
-  </table></div>` : '<p class="muted">Aún no hay equipos en la liga.</p>'}
+  </table></div>` : '<p class="muted">Aún no hay equipos en este torneo.</p>'}
 </section>
 
 <section>
@@ -69,9 +83,10 @@ const fmtRemaining = (deadline) => {
   return `${h}h ${m}m`;
 };
 
-exports.registerForm = (team, error = '', success = '', deadline = null) => layout(`Registro · ${team.name}`, `
+exports.registerForm = (team, tournament, error = '', success = '', deadline = null) => layout(`Registro · ${team.name}`, `
 <section class="narrow">
   <h2>Regístrate en <span class="accent">${esc(team.name)}</span></h2>
+  <p class="muted">Torneo: ${esc(tournament.name)}</p>
   <p class="muted">Llena tus datos y sube una foto. El número de jersey queda reservado para ti.</p>
   ${deadline ? `<p class="muted">El registro cierra en <strong>${fmtRemaining(deadline)}</strong>.</p>` : ''}
   ${success ? `<p class="success">${esc(success)}</p>` : ''}
@@ -127,27 +142,27 @@ form.addEventListener('submit', (e) => {
   if (!compressedBlob) return;
   e.preventDefault();
   const data = new FormData(form);
-  if (compressedBlob) data.set('photo', compressedBlob, 'foto.jpg');
+  data.set('photo', compressedBlob, 'foto.jpg');
   fetch(form.action, { method: 'POST', body: data })
-    .then((r) => { if (r.ok) window.location.href = '/listo'; else return r.text().then(t => { throw new Error(t); }); })
+    .then((r) => { if (r.ok) window.location.href = window.location.pathname + '?ok=1'; else return r.text().then(t => { throw new Error(t); }); })
     .catch((err) => alert('Error: ' + err.message));
 });
 </script>
 `);
 
-exports.registrationClosed = () => layout('Registro cerrado', `
+exports.registrationClosed = (tournament) => layout('Registro cerrado', `
 <section class="narrow center">
   <div class="big-emoji">🔒</div>
   <h2>El registro de jugadores terminó</h2>
-  <p>La liga ya comenzó y los rosters están cerrados.</p>
-  <p><a class="btn-link" href="/">Ver tabla de posiciones</a></p>
+  <p>El torneo ${esc(tournament.name)} ya comenzó y los rosters están cerrados.</p>
+  <p><a class="btn-link" href="/t/${esc(tournament.slug)}">Ver tabla de posiciones</a></p>
 </section>
 `);
 
-exports.teamRoster = (team, players) => layout(`Roster · ${team.name}`, `
+exports.teamRoster = (team, players, tournament) => layout(`Roster · ${team.name}`, `
 <section>
   <h2>${team.logo ? `<img class="heading-logo" src="/uploads/${esc(team.logo)}" alt="">` : ''}<span class="accent">${esc(team.name)}</span></h2>
-  <p class="muted">${players.length} jugador${players.length === 1 ? '' : 'es'} registrado${players.length === 1 ? '' : 's'}</p>
+  <p class="muted">${esc(tournament.name)} · ${plural(players.length, 'jugador registrado', 'jugadores registrados')}</p>
   ${players.length ? `<div class="roster">
     ${players.map((p) => `<div class="player">
       <div class="jersey">${p.jersey}</div>
@@ -155,7 +170,7 @@ exports.teamRoster = (team, players) => layout(`Roster · ${team.name}`, `
       <div class="player-name">${esc(p.name)}</div>
     </div>`).join('')}
   </div>` : '<p class="muted">Aún no hay jugadores registrados en este equipo.</p>'}
-  <p><a href="/">← Volver a la liga</a></p>
+  <p><a href="/t/${esc(tournament.slug)}">← Volver al torneo</a></p>
 </section>
 `);
 
@@ -172,22 +187,57 @@ exports.adminLogin = (error = '') => layout('Admin', `
 </section>
 `);
 
-exports.adminDashboard = (teams, standings, games, deadline, editGame = null) => layout('Admin · Liga', `
+exports.adminTournaments = (tournaments) => layout('Admin · Torneos', `
+<section>
+  <h2>Panel de la liga</h2>
+  <form method="post" action="/admin/tournaments" class="inline-form">
+    <label>Nuevo torneo
+      <input name="name" required maxlength="60" placeholder="Ej. Torneo Femenil 2026">
+    </label>
+    <button type="submit">Crear torneo</button>
+  </form>
+  ${tournaments.length ? `<div class="table-wrap"><table>
+    <thead><tr><th>Torneo</th><th>Equipos</th><th>Registro</th><th></th></tr></thead>
+    <tbody>
+      ${tournaments.map((t) => {
+        const open = t.roster_deadline && Date.parse(t.roster_deadline) > Date.now();
+        return `<tr>
+          <td><strong>${esc(t.name)}</strong></td>
+          <td>${t.team_count}</td>
+          <td>${open ? 'Abierto' : 'Cerrado'}</td>
+          <td class="game-actions">
+            <a class="small" href="/admin/t/${esc(t.id)}">Administrar</a>
+            <a class="small" href="/t/${esc(t.slug)}">Ver público</a>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>` : '<p class="muted">Crea el primer torneo para empezar.</p>'}
+</section>
+
+<section>
+  <p class="muted">Cada torneo tiene sus propios equipos, jugadores, links de registro, juegos y tabla de posiciones.</p>
+  <form method="post" action="/admin/logout"><button type="submit" class="small">Cerrar sesión</button></form>
+</section>
+`);
+
+exports.adminDashboard = (tournament, teams, standings, games, deadline, editGame = null) => layout(`Admin · ${tournament.name}`, `
+<p><a class="small" href="/admin">← Todos los torneos</a></p>
 <section class="reg-card ${deadline && deadline > new Date() ? 'open' : 'closed'}">
-  <h2>Registro de rosters</h2>
+  <h2>Registro de rosters · ${esc(tournament.name)}</h2>
   ${deadline && deadline > new Date() ? `
   <p>Abierto · cierra en <strong>${fmtRemaining(deadline)}</strong> (${esc(deadline.toLocaleString())})</p>
   <div class="reg-actions">
-    <form method="post" action="/admin/registration/extend"><button type="submit" class="small">Extender 24h</button></form>
-    <form method="post" action="/admin/registration/close" onsubmit="return confirm('Cerrar el registro ahora? Ya nadie podrá registrar jugadores.')"><button type="submit" class="small danger">Cerrar registro</button></form>
+    <form method="post" action="/admin/t/${esc(tournament.id)}/registration/extend"><button type="submit" class="small">Extender 24h</button></form>
+    <form method="post" action="/admin/t/${esc(tournament.id)}/registration/close" onsubmit="return confirm('Cerrar el registro ahora? Ya nadie podrá registrar jugadores.')"><button type="submit" class="small danger">Cerrar registro</button></form>
   </div>` : `
   <p>Cerrado. Los jugadores no pueden registrarse.</p>
-  <form method="post" action="/admin/registration/open"><button type="submit">Abrir registro por 72h</button></form>`}
+  <form method="post" action="/admin/t/${esc(tournament.id)}/registration/open"><button type="submit">Abrir registro por 72h</button></form>`}
 </section>
 
 <section>
   <h2>Equipos</h2>
-  <form method="post" action="/admin/teams" class="inline-form" enctype="multipart/form-data">
+  <form method="post" action="/admin/t/${esc(tournament.id)}/teams" class="inline-form" enctype="multipart/form-data">
     <input name="name" required maxlength="60" placeholder="Nombre del nuevo equipo">
     <label class="file-field">Logo <input name="logo" type="file" accept="image/*"></label>
     <button type="submit">Crear equipo</button>
@@ -200,18 +250,18 @@ exports.adminDashboard = (teams, standings, games, deadline, editGame = null) =>
         <td>${t.count}</td>
         <td class="link-cell">
           <input readonly value="${esc(t.regUrl)}" onclick="this.select();navigator.clipboard&&navigator.clipboard.writeText(this.value)">
-          <button type="button" class="small" onclick="navigator.clipboard.writeText('${esc(t.regUrl)}').then(()=>this.textContent='Copiado ✓',()=>{this.previousElementSibling.select()})">Copiar</button>
+          <button type="button" class="small" onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(()=>this.textContent='Copiado ✓',()=>{})">Copiar</button>
           <a class="small" href="/r/${esc(t.token)}">Abrir</a>
           <a class="small" href="/team/${t.id}">Roster</a>
         </td>
         <td class="logo-cell">
           ${t.logo ? `<img class="thumb" src="/uploads/${esc(t.logo)}" alt="">` : ''}
-          <form method="post" action="/admin/teams/${t.id}/logo" enctype="multipart/form-data" class="logo-form">
+          <form method="post" action="/admin/t/${esc(tournament.id)}/teams/${t.id}/logo" enctype="multipart/form-data" class="logo-form">
             <input type="file" name="logo" accept="image/*" required>
             <button type="submit" class="small">Guardar</button>
           </form>
         </td>
-        <td><form method="post" action="/admin/teams/${t.id}?_method=DELETE" onsubmit="return confirm('Borrar equipo ${esc(t.name)} y todo su roster?')"><button type="submit" class="danger small">Borrar</button></form></td>
+        <td><form method="post" action="/admin/t/${esc(tournament.id)}/teams/${t.id}?_method=DELETE" onsubmit="return confirm('Borrar este equipo y todo su roster?')"><button type="submit" class="danger small">Borrar</button></form></td>
       </tr>`).join('')}
     </tbody>
   </table></div>` : '<p class="muted">Crea el primer equipo para generar su link de registro.</p>'}
@@ -220,7 +270,7 @@ exports.adminDashboard = (teams, standings, games, deadline, editGame = null) =>
 <section>
   <h2>${editGame ? 'Editar resultado' : 'Registrar resultado'}</h2>
   ${teams.length >= 2 ? `
-  <form method="post" action="${editGame ? `/admin/games/${esc(editGame.id)}` : '/admin/games'}" class="inline-form wrap">
+  <form method="post" action="${editGame ? `/admin/t/${esc(tournament.id)}/games/${esc(editGame.id)}` : `/admin/t/${esc(tournament.id)}/games`}" class="inline-form wrap">
     <label>Local <select name="home_id" required>${teams.map((t) => `<option value="${t.id}" ${editGame && editGame.home_id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
     <input name="home_score" type="number" required min="0" class="score" placeholder="0" value="${editGame ? editGame.home_score : ''}">
     <span class="vs">vs</span>
@@ -228,7 +278,7 @@ exports.adminDashboard = (teams, standings, games, deadline, editGame = null) =>
     <label><select name="away_id" required>${teams.map((t, i) => `<option value="${t.id}" ${(editGame ? editGame.away_id === t.id : i === 1) ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select> Visitante</label>
     <label>Fecha <input name="played_at" type="datetime-local" value="${editGame ? editGame.played_at.replace(' ', 'T') : ''}"></label>
     <button type="submit">${editGame ? 'Guardar cambios' : 'Guardar resultado'}</button>
-    ${editGame ? `<a class="small" href="/admin">Cancelar</a>` : ''}
+    ${editGame ? `<a class="small" href="/admin/t/${esc(tournament.id)}">Cancelar</a>` : ''}
   </form>` : '<p class="muted">Necesitas al menos 2 equipos.</p>'}
 
   ${games.length ? `<div class="table-wrap"><table>
@@ -237,7 +287,7 @@ exports.adminDashboard = (teams, standings, games, deadline, editGame = null) =>
       ${games.map((g) => `<tr>
         <td>${esc(g.played_at)}</td>
         <td>${esc(g.home_name)} <b>${g.home_score}</b> — <b>${g.away_score}</b> ${esc(g.away_name)}</td>
-        <td><span class="game-actions"><a class="small" href="/admin?edit=${esc(g.id)}">Editar</a> <form method="post" action="/admin/games/${g.id}?_method=DELETE" onsubmit="return confirm('Borrar este juego?')"><button type="submit" class="danger small">Borrar</button></form></span></td>
+        <td><span class="game-actions"><a class="small" href="/admin/t/${esc(tournament.id)}?edit=${esc(g.id)}">Editar</a> <form method="post" action="/admin/t/${esc(tournament.id)}/games/${g.id}?_method=DELETE" onsubmit="return confirm('Borrar este juego?')"><button type="submit" class="danger small">Borrar</button></form></span></td>
       </tr>`).join('')}
     </tbody>
   </table></div>` : ''}
@@ -245,7 +295,7 @@ exports.adminDashboard = (teams, standings, games, deadline, editGame = null) =>
 
 <section>
   <h2>Posiciones (vista del público)</h2>
-  <p><a href="/">Ver tabla pública →</a></p>
+  <p><a href="/t/${esc(tournament.slug)}">Ver tabla pública →</a></p>
 </section>
 
 <form method="post" action="/admin/logout"><button type="submit" class="small">Cerrar sesión</button></form>
